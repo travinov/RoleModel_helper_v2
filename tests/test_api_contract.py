@@ -99,6 +99,33 @@ class MessageApiContractTests(unittest.TestCase):
         self.assertEqual(len(service.post_calls), 1)
         self.assertEqual(service.get_calls, 0)
 
+    def test_invalid_or_unbounded_payload_is_rejected_before_service(self) -> None:
+        invalid_payloads = (
+            {"request_id": "req", "state_revision": 0},
+            {"request_id": "req", "text": "   ", "state_revision": 0},
+            {"request_id": "r" * 129, "text": "ok", "state_revision": 0},
+            {"request_id": "req", "text": "x" * 4001, "state_revision": 0},
+            {"request_id": "req", "text": "ok", "state_revision": -1},
+            {
+                "request_id": "req",
+                "text": "ok",
+                "state_revision": 0,
+                "unexpected": "field",
+            },
+        )
+        for payload in invalid_payloads:
+            with self.subTest(payload_keys=tuple(payload)):
+                service = StubMessageService()
+                client = TestClient(create_app(message_service=service))
+
+                response = client.post(
+                    "/api/v2/sessions/session-api/messages",
+                    json=payload,
+                )
+
+                self.assertEqual(response.status_code, 422)
+                self.assertEqual(service.post_calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()

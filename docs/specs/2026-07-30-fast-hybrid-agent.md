@@ -144,6 +144,8 @@
   - Use last-good immutable catalog data rather than partial refreshes.
   - Keep the first vertical slice small enough to benchmark.
 - Open risks:
-  - Production cardinality and query plans are not currently measured because local PostgreSQL is unavailable.
+  - Temporary local PostgreSQL verifies isolation and transaction behavior, but
+    production cardinality and query plans remain unmeasured until the
+    corporate catalog is connected.
   - Port `8001` must still be checked on the target server.
   - Corporate certificate behavior needs a real GigaChat smoke test.

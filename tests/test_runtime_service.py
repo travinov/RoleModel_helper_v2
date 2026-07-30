@@ -1,23 +1,24 @@
 from __future__ import annotations
 
-import tempfile
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
-from pathlib import Path
 
 from app.agent.models import Plan
 from app.agent.service import AgentEngine
 from app.catalog.cache import CatalogBundle, CatalogCache
 from app.runtime.service import RuntimeService, StateRevisionConflict
 
-from tests.fakes import RecordingPlanner, VersionedCatalogSource, load_catalog_mapping
+from tests.fakes import (
+    InMemoryStateStore,
+    RecordingPlanner,
+    VersionedCatalogSource,
+    load_catalog_mapping,
+)
 
 
 class RuntimeServiceTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp_dir.cleanup)
         source = VersionedCatalogSource(
             {"v42": load_catalog_mapping("catalog_v42.json")},
             bundle_factory=CatalogBundle.from_mapping,
@@ -29,7 +30,7 @@ class RuntimeServiceTests(unittest.TestCase):
             planner=RecordingPlanner(error=AssertionError("fast path called GigaChat")),
         )
         self.runtime = RuntimeService(
-            database_path=Path(self.temp_dir.name) / "state.sqlite3",
+            state_store=InMemoryStateStore(),
             engine=engine,
         )
         self.runtime.initialize()
@@ -130,7 +131,7 @@ class RuntimeServiceTests(unittest.TestCase):
         cache = CatalogCache(source)
         cache.refresh("v42")
         runtime = RuntimeService(
-            database_path=Path(self.temp_dir.name) / "concurrency.sqlite3",
+            state_store=InMemoryStateStore(),
             engine=AgentEngine(catalog_cache=cache, planner=planner),
         )
         runtime.initialize()
