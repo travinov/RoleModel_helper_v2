@@ -1,0 +1,41 @@
+{
+  "version": "v43",
+  "systems": [
+    {
+      "id": "sberdrug",
+      "name": "СберДруг",
+      "aliases": [
+        {"value": "сбердруг", "safety": "SAFE"},
+        {"value": "ас сбердруг", "safety": "SAFE"},
+        {"value": "друг", "safety": "AMBIGUOUS"}
+      ],
+      "roles": [
+        {"id": "role-reader-v43", "name": "Читатель заявок", "access_level": 1},
+        {"id": "role-auditor-v43", "name": "Аудитор заявок", "access_level": 2}
+      ]
+    },
+    {
+      "id": "new-system",
+      "name": "Новая АС",
+      "aliases": [
+        {"value": "новая ас", "safety": "SAFE"}
+      ],
+      "roles": [
+        {"id": "role-new-v43", "name": "Пользователь новой АС", "access_level": 1}
+      ]
+    }
+  ],
+  "departments": [
+    {"id": "samara-1", "city": "Самара", "name": "СМР №1"},
+    {"id": "samara-10", "city": "Самара", "name": "СМР №10"},
+    {"id": "samara-11", "city": "Самара", "name": "СМР №11"}
+  ],
+  "instructions": [
+    {
+      "id": "instruction-sberdrug",
+      "system_id": "sberdrug",
+      "title": "Как получить доступ",
+      "citation": "catalog://v43/instruction-sberdrug"
+    }
+  ]
+}

@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RoleModel Helper V2</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #152126;
+      --muted: #5f6d71;
+      --paper: #f5f3ed;
+      --card: rgba(255, 255, 255, .82);
+      --line: rgba(21, 33, 38, .12);
+      --accent: #11796b;
+      --accent-soft: #dcefe9;
+      --user: #163b45;
+      --shadow: 0 20px 60px rgba(31, 49, 52, .10);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 10%, rgba(56, 159, 135, .16), transparent 30rem),
+        radial-gradient(circle at 90% 90%, rgba(225, 172, 91, .16), transparent 34rem),
+        var(--paper);
+      font: 15px/1.5 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .shell {
+      width: min(980px, calc(100% - 32px));
+      margin: 24px auto;
+      min-height: calc(100vh - 48px);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,.85);
+      border-radius: 26px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .mark {
+      width: 42px; height: 42px; border-radius: 14px;
+      display: grid; place-items: center;
+      color: white; font-weight: 800; letter-spacing: -.06em;
+      background: linear-gradient(145deg, #189982, #0f655d);
+      box-shadow: 0 9px 24px rgba(17,121,107,.24);
+    }
+    h1 { font-size: 17px; line-height: 1.2; margin: 0; letter-spacing: -.02em; }
+    .subtitle { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .health {
+      display: flex; align-items: center; gap: 7px;
+      color: var(--muted); font-size: 12px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #b7b7b7; }
+    .dot.ok { background: #2aa978; box-shadow: 0 0 0 5px rgba(42,169,120,.10); }
+    main { min-height: 0; overflow-y: auto; padding: 24px; }
+    .intro {
+      max-width: 640px;
+      padding: 19px 21px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,.68);
+    }
+    .intro strong { display: block; margin-bottom: 6px; }
+    .intro p { margin: 0; color: var(--muted); }
+    .quick { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    button.quick-action {
+      border: 1px solid rgba(17,121,107,.22);
+      border-radius: 999px;
+      padding: 8px 12px;
+      color: #0d685d;
+      background: var(--accent-soft);
+      cursor: pointer;
+    }
+    .message { display: flex; margin: 18px 0; }
+    .message.user { justify-content: flex-end; }
+    .bubble {
+      max-width: min(720px, 86%);
+      padding: 14px 16px;
+      border-radius: 18px;
+      white-space: pre-wrap;
+    }
+    .assistant .bubble {
+      background: white; border: 1px solid var(--line); border-bottom-left-radius: 6px;
+    }
+    .user .bubble {
+      color: white; background: var(--user); border-bottom-right-radius: 6px;
+    }
+    .meta {
+      display: flex; flex-wrap: wrap; gap: 7px;
+      margin-top: 10px; color: var(--muted); font-size: 11px;
+    }
+    .pill { padding: 3px 7px; border-radius: 999px; background: #edf1ef; }
+    .progress {
+      display: inline-flex; align-items: center; gap: 9px;
+      color: var(--muted);
+    }
+    .spinner {
+      width: 15px; height: 15px; border-radius: 50%;
+      border: 2px solid #cbd8d4; border-top-color: var(--accent);
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      padding: 16px;
+      border-top: 1px solid var(--line);
+      background: rgba(255,255,255,.72);
+    }
+    textarea {
+      width: 100%; min-height: 48px; max-height: 140px; resize: none;
+      padding: 13px 15px;
+      border: 1px solid var(--line); border-radius: 15px;
+      outline: none; color: var(--ink); background: white; font: inherit;
+    }
+    textarea:focus { border-color: rgba(17,121,107,.55); box-shadow: 0 0 0 3px rgba(17,121,107,.09); }
+    .send {
+      min-width: 106px; border: 0; border-radius: 15px;
+      color: white; background: var(--accent); font-weight: 700; cursor: pointer;
+    }
+    .send:disabled { cursor: wait; opacity: .55; }
+    @media (max-width: 640px) {
+      .shell { width: 100%; min-height: 100vh; margin: 0; border-radius: 0; }
+      header, main { padding: 16px; }
+      .health span:last-child { display: none; }
+      form { grid-template-columns: 1fr; }
+      .send { min-height: 44px; }
+    }
+  </style>
+</head>
+<body>
+<section class="shell">
+  <header>
+    <div class="brand">
+      <div class="mark">V2</div>
+      <div>
+        <h1>RoleModel Helper</h1>
+        <div class="subtitle">Быстрый гибридный агент</div>
+      </div>
+    </div>
+    <div class="health"><span class="dot" id="healthDot"></span><span id="healthText">Проверяю сервис</span></div>
+  </header>
+  <main id="messages">
+    <div class="intro" id="intro">
+      <strong>Доступы и роли — без лишнего ожидания</strong>
+      <p>Частые запросы обрабатываются локальным каталогом. GigaChat подключается только когда формулировка неоднозначна.</p>
+      <div class="quick">
+        <button class="quick-action" data-text="Покажи роли в Демо АС Доступ">Роли в демо-АС</button>
+        <button class="quick-action" data-text="Нужен доступ, чтобы согласовывать заявки; что выбрать?">Неоднозначный запрос</button>
+        <button class="quick-action" data-text="Начать заново">Сбросить контекст</button>
+      </div>
+    </div>
+  </main>
+  <form id="composer">
+    <textarea id="input" placeholder="Например: Покажи роли в Демо АС Доступ" rows="1"></textarea>
+    <button class="send" id="send" type="submit">Отправить</button>
+  </form>
+</section>
+<script>
+  const messages = document.querySelector("#messages");
+  const input = document.querySelector("#input");
+  const send = document.querySelector("#send");
+  let sessionId = null;
+  let revision = 0;
+
+  function addMessage(role, text, diagnostics) {
+    const row = document.createElement("div");
+    row.className = `message ${role}`;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    if (diagnostics) {
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const total = Number(diagnostics.durations_ms?.total || 0).toFixed(1);
+      meta.innerHTML = `<span class="pill">${diagnostics.route === "DETERMINISTIC" ? "быстрый путь" : "GigaChat"}</span><span class="pill">${total} мс</span><span class="pill">каталог ${diagnostics.catalog_version}</span>`;
+      bubble.appendChild(meta);
+    }
+    row.appendChild(bubble);
+    messages.appendChild(row);
+    messages.scrollTop = messages.scrollHeight;
+    return row;
+  }
+
+  async function ensureSession() {
+    if (sessionId) return;
+    const response = await fetch("/api/v2/sessions", { method: "POST" });
+    if (!response.ok) throw new Error(`Не удалось создать сессию: ${response.status}`);
+    const payload = await response.json();
+    sessionId = payload.session_id;
+    revision = payload.state.revision;
+  }
+
+  async function submit(text) {
+    text = text.trim();
+    if (!text) return;
+    document.querySelector("#intro")?.remove();
+    addMessage("user", text);
+    input.value = "";
+    send.disabled = true;
+    const progress = addMessage("assistant", "");
+    const bubble = progress.querySelector(".bubble");
+    bubble.innerHTML = '<span class="progress"><span class="spinner"></span><span>Понимаю запрос…</span></span>';
+    const stage = bubble.querySelector(".progress span:last-child");
+    const stageTimer = setTimeout(() => stage.textContent = "Ищу в каталоге…", 350);
+    try {
+      await ensureSession();
+      const response = await fetch(`/api/v2/sessions/${sessionId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          request_id: crypto.randomUUID(),
+          text,
+          state_revision: revision
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || `Ошибка ${response.status}`);
+      revision = payload.state.revision;
+      progress.remove();
+      addMessage("assistant", payload.assistant.text, payload.diagnostics);
+    } catch (error) {
+      progress.remove();
+      addMessage("assistant", `Не удалось получить ответ: ${error.message}`);
+    } finally {
+      clearTimeout(stageTimer);
+      send.disabled = false;
+      input.focus();
+    }
+  }
+
+  document.querySelector("#composer").addEventListener("submit", event => {
+    event.preventDefault();
+    submit(input.value);
+  });
+  input.addEventListener("keydown", event => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      submit(input.value);
+    }
+  });
+  document.querySelectorAll(".quick-action").forEach(button => {
+    button.addEventListener("click", () => submit(button.dataset.text));
+  });
+
+  fetch("/api/v2/health")
+    .then(response => response.json())
+    .then(health => {
+      document.querySelector("#healthDot").classList.toggle("ok", health.catalog_ready);
+      document.querySelector("#healthText").textContent =
+        health.catalog_ready ? `Каталог ${health.catalog_version}` : "Каталог недоступен";
+    })
+    .catch(() => document.querySelector("#healthText").textContent = "Сервис недоступен");
+</script>
+</body>
+</html>

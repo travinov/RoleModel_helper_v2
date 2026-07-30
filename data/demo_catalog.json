@@ -1,0 +1,42 @@
+{
+  "version": "demo-v1",
+  "systems": [
+    {
+      "id": "access-flow",
+      "name": "Демо АС Доступ",
+      "aliases": [
+        {"value": "демо ас доступ", "safety": "SAFE"},
+        {"value": "ас доступ", "safety": "SAFE"},
+        {"value": "доступ", "safety": "AMBIGUOUS"}
+      ],
+      "roles": [
+        {"id": "access-reader", "name": "Просмотр заявок", "access_level": 1},
+        {"id": "access-approver", "name": "Согласование заявок", "access_level": 2}
+      ]
+    },
+    {
+      "id": "team-space",
+      "name": "Демо АС Команда",
+      "aliases": [
+        {"value": "демо ас команда", "safety": "SAFE"},
+        {"value": "ас команда", "safety": "SAFE"},
+        {"value": "команда", "safety": "AMBIGUOUS"}
+      ],
+      "roles": [
+        {"id": "team-reader", "name": "Просмотр структуры команды", "access_level": 1}
+      ]
+    }
+  ],
+  "departments": [
+    {"id": "demo-samara-1", "city": "Самара", "name": "Демо отдел №1"},
+    {"id": "demo-samara-10", "city": "Самара", "name": "Демо отдел №10"}
+  ],
+  "instructions": [
+    {
+      "id": "demo-access-instruction",
+      "system_id": "access-flow",
+      "title": "Демонстрационная инструкция по доступу",
+      "citation": "catalog://demo-v1/demo-access-instruction"
+    }
+  ]
+}
