@@ -91,6 +91,19 @@ class CatalogCacheTests(unittest.TestCase):
         self.assertTrue(all(result.version == "v43" for result in results))
         self.assertIs(cache.get(), cache.get())
 
+    def test_active_pointer_refresh_switches_versions_between_pinned_turns(self) -> None:
+        source = make_source()
+        cache = CatalogCache(source)
+        cache.refresh("v42")
+        pinned = cache.get()
+        source.active_version_value = "v43"
+
+        result = cache.refresh_active()
+
+        self.assertTrue(result.activated)
+        self.assertEqual(cache.get().version, "v43")
+        self.assertEqual(pinned.version, "v42")
+
 
 if __name__ == "__main__":
     unittest.main()

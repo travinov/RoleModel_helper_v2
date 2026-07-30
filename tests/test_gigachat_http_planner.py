@@ -96,6 +96,21 @@ class GigaChatHttpPlannerTests(unittest.TestCase):
         self.assertEqual(call["payload"]["request_id"], "req-http-planner")
         self.assertEqual(call["headers"]["Authorization"], f"Bearer {token}")
         self.assertNotIn(token, json.dumps(call["payload"], ensure_ascii=False))
+        user_payload = json.loads(call["payload"]["messages"][1]["content"])
+        self.assertNotIn("systems", user_payload)
+        self.assertIn("catalog_candidates", user_payload)
+        candidates = user_payload["catalog_candidates"]
+        self.assertLessEqual(len(candidates["systems"]), 5)
+        self.assertLessEqual(len(candidates["departments"]), 5)
+        self.assertLessEqual(len(candidates["positions"]), 5)
+        self.assertEqual(
+            [item["id"] for item in candidates["systems"]],
+            ["sberdrug"],
+        )
+        self.assertNotIn(
+            "СберКоманда",
+            json.dumps(user_payload, ensure_ascii=False),
+        )
 
     def test_malformed_provider_content_is_rejected(self) -> None:
         transport = FakeTransport(

@@ -1,0 +1,119 @@
+{
+  "version": "v44-org",
+  "departments": [
+    {
+      "id": "department-samara-credit-2",
+      "city": "Самара",
+      "name": "Отдел кредитования корпоративных клиентов номер 2",
+      "aliases": [
+        {"value": "отдел 2", "safety": "AMBIGUOUS"},
+        {"value": "ОККК 2", "safety": "SAFE"}
+      ]
+    },
+    {
+      "id": "department-moscow-credit-2",
+      "city": "Москва",
+      "name": "Отдел кредитования корпоративных клиентов №2",
+      "aliases": [
+        {"value": "отдел 2", "safety": "AMBIGUOUS"}
+      ]
+    },
+    {
+      "id": "department-samara-credit-20",
+      "city": "Самара",
+      "name": "Отдел кредитования корпоративных клиентов №20",
+      "aliases": [
+        {"value": "отдел 20", "safety": "SAFE"}
+      ]
+    }
+  ],
+  "positions": [
+    {
+      "id": "position-head",
+      "name": "Руководитель",
+      "aliases": [
+        {"value": "начальник", "safety": "SAFE"}
+      ]
+    },
+    {
+      "id": "position-risk",
+      "name": "Риск-менеджер",
+      "aliases": []
+    }
+  ],
+  "systems": [
+    {
+      "id": "access-flow",
+      "name": "АС Заявки",
+      "aliases": [
+        {"value": "заявки", "safety": "SAFE"}
+      ],
+      "roles": [
+        {
+          "id": "access-reader",
+          "name": "Просмотр заявок",
+          "access_level": 1
+        },
+        {
+          "id": "access-approver",
+          "name": "Согласование заявок",
+          "access_level": 2
+        }
+      ]
+    },
+    {
+      "id": "risk-report",
+      "name": "АС Риск-отчетность",
+      "aliases": [
+        {"value": "риск отчетность", "safety": "SAFE"}
+      ],
+      "roles": [
+        {
+          "id": "risk-viewer",
+          "name": "Просмотр риск-отчетов",
+          "access_level": 1
+        }
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "id": "profile-samara-head",
+      "name": "Руководитель отдела кредитования Самара",
+      "city": "Самара",
+      "department_ids": ["department-samara-credit-2"],
+      "position_ids": ["position-head"],
+      "access": [
+        {
+          "system_id": "access-flow",
+          "role_ids": ["access-approver"]
+        }
+      ]
+    },
+    {
+      "id": "profile-moscow-head",
+      "name": "Руководитель отдела кредитования Москва",
+      "city": "Москва",
+      "department_ids": ["department-moscow-credit-2"],
+      "position_ids": ["position-head"],
+      "access": [
+        {
+          "system_id": "access-flow",
+          "role_ids": ["access-reader"]
+        },
+        {
+          "system_id": "risk-report",
+          "role_ids": ["risk-viewer"]
+        }
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "id": "instruction-access-flow",
+      "system_id": "access-flow",
+      "title": "Как запросить доступ к АС Заявки",
+      "citation": "catalog://v44-org/instruction-access-flow"
+    }
+  ]
+}

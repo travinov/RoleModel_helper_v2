@@ -12,6 +12,7 @@ import requests
 
 from app.agent.models import Plan, TurnRequest
 from app.catalog.cache import CatalogBundle
+from app.tools.catalog import CatalogSearchTools
 
 
 class PlannerResponseError(ValueError):
@@ -201,14 +202,7 @@ class GigaChatHttpPlanner:
         deadline_ms: int,
     ) -> Plan:
         started_at = self.clock()
-        systems = [
-            {
-                "id": system_id,
-                "name": str(system["name"]),
-                "aliases": [str(alias["value"]) for alias in system["aliases"]],
-            }
-            for system_id, system in context.systems.items()
-        ][:100]
+        catalog_candidates = self._catalog_candidates(request, context)
         state = {
             "intent": request.state.intent,
             "phase": request.state.phase,
@@ -223,14 +217,16 @@ class GigaChatHttpPlanner:
             "Ты планировщик агента по ролевой модели. Верни только JSON: "
             "catalog_version, intent, action, slots, confidence. "
             "intent: SYSTEM_DISCOVERY, ROLE_DISCOVERY, ROLE_ACQUISITION или INSTRUCTION_LOOKUP. "
-            "Не придумывай catalog id: используй только id из переданного каталога."
+            "Не придумывай catalog id: используй только id из ограниченного "
+            "catalog_candidates. Если подходящего id нет, оставь соответствующий "
+            "slot пустым. Каталог целиком тебе не передаётся."
         )
         user_payload = {
             "catalog_version": context.version,
             "request_id": request.request_id,
             "text": request.text[:2000],
             "state": state,
-            "systems": systems,
+            "catalog_candidates": catalog_candidates,
         }
         payload = {
             "catalog_version": context.version,
@@ -278,3 +274,89 @@ class GigaChatHttpPlanner:
             )
         except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
             raise PlannerResponseError("GigaChat returned malformed structured plan") from exc
+
+    @staticmethod
+    def _catalog_candidates(
+        request: TurnRequest,
+        context: CatalogBundle,
+    ) -> dict[str, list[dict[str, Any]]]:
+        tools = CatalogSearchTools(context)
+        system_matches: dict[str, dict[str, Any]] = {}
+        direct_systems = tools.search_systems(request.text, limit=5)
+        for candidate in direct_systems.candidates:
+            system_matches[candidate.id] = {
+                "id": candidate.id,
+                "label": candidate.label,
+                "score": candidate.score,
+                "matched_roles": [],
+            }
+
+        for system_id, system in context.systems.items():
+            role_matches = tools.search_roles(
+                system_id=system_id,
+                query=request.text,
+                limit=3,
+            )
+            if not role_matches.candidates:
+                continue
+            entry = system_matches.setdefault(
+                system_id,
+                {
+                    "id": system_id,
+                    "label": str(system["name"]),
+                    "score": 0.0,
+                    "matched_roles": [],
+                },
+            )
+            entry["score"] = max(
+                float(entry["score"]),
+                max(item.score for item in role_matches.candidates),
+            )
+            entry["matched_roles"] = [
+                {
+                    "id": item.id,
+                    "label": item.label,
+                    "access_level": item.context.get("access_level"),
+                }
+                for item in role_matches.candidates[:3]
+            ]
+
+        state_system_id = str(request.state.slots.get("system_id") or "")
+        if state_system_id in context.systems:
+            system = context.systems[state_system_id]
+            system_matches[state_system_id] = {
+                "id": state_system_id,
+                "label": str(system["name"]),
+                "score": 1.0,
+                "matched_roles": system_matches.get(
+                    state_system_id, {}
+                ).get("matched_roles", []),
+            }
+
+        systems = sorted(
+            system_matches.values(),
+            key=lambda item: (-float(item["score"]), str(item["label"]), str(item["id"])),
+        )[:5]
+        departments = [
+            {
+                "id": item.id,
+                "label": item.label,
+                "city": item.context.get("city"),
+                "number": item.context.get("number"),
+                "score": item.score,
+            }
+            for item in tools.search_departments(request.text, limit=5).candidates
+        ]
+        positions = [
+            {
+                "id": item.id,
+                "label": item.label,
+                "score": item.score,
+            }
+            for item in tools.search_positions(request.text, limit=5).candidates
+        ]
+        return {
+            "systems": systems,
+            "departments": departments,
+            "positions": positions,
+        }

@@ -15,6 +15,12 @@ class ConfigIsolationTests(unittest.TestCase):
         self.assertEqual(settings.install_dir, Path.home() / "RoleModelHelperV2")
         self.assertEqual(settings.service_name, "rolemodel-helper-v2.service")
         self.assertNotEqual(settings.state_schema, settings.v1_state_schema)
+        self.assertEqual(settings.state_schema, "rolemodel_v2_runtime")
+        self.assertEqual(settings.catalog_backend, "postgres")
+        self.assertEqual(settings.catalog_schema, "rolemodel_v2_catalog")
+        self.assertEqual(settings.effective_catalog_dsn, settings.database_dsn)
+        self.assertIsNone(settings.catalog_version)
+        self.assertEqual(settings.database_dsn, "postgresql:///rolemodel")
         self.assertTrue(settings.tls_verify)
         settings.validate_isolation()
 
@@ -24,28 +30,48 @@ class ConfigIsolationTests(unittest.TestCase):
             "APP_PORT": "8001",
             "INSTALL_DIR": "/srv/RoleModelHelperV2",
             "SERVICE_NAME": "rolemodel-helper-v2.service",
-            "STATE_SCHEMA": "rolemodel_helper_v2",
-            "STATE_DATABASE_PATH": "/srv/RoleModelHelperV2/data/state.sqlite3",
+            "DATABASE_DSN": "postgresql://rmv2@localhost/rolemodel",
+            "STATE_SCHEMA": "rolemodel_v2_runtime",
             "V1_APP_PORT": "8000",
             "V1_INSTALL_DIR": "/srv/RoleModelHelper",
             "V1_SERVICE_NAME": "rolemodel-helper.service",
             "V1_STATE_SCHEMA": "public",
-            "V1_STATE_DATABASE_PATH": "/srv/RoleModelHelper/data/state.sqlite3",
         }
         collisions = (
             ("port", {"APP_PORT": "8000"}),
             ("service", {"SERVICE_NAME": "rolemodel-helper.service"}),
             ("directory", {"INSTALL_DIR": "/srv/RoleModelHelper"}),
             ("schema", {"STATE_SCHEMA": "public"}),
+            ("catalog schema", {"CATALOG_SCHEMA": "public"}),
             (
-                "state database",
-                {"STATE_DATABASE_PATH": "/srv/RoleModelHelper/data/state.sqlite3"},
+                "catalog/runtime schema",
+                {"CATALOG_SCHEMA": "rolemodel_v2_runtime"},
             ),
         )
 
         for name, override in collisions:
             with self.subTest(name=name):
                 settings = Settings.from_mapping({**safe, **override})
+                with self.assertRaises(IsolationError):
+                    settings.validate_isolation()
+
+    def test_json_catalog_requires_explicit_backend_and_path(self) -> None:
+        with self.assertRaises(IsolationError):
+            Settings.from_mapping({"CATALOG_BACKEND": "json"}).validate_isolation()
+
+        settings = Settings.from_mapping(
+            {
+                "CATALOG_BACKEND": "json",
+                "CATALOG_PATH": "/tmp/catalog.json",
+                "CATALOG_VERSION": "fixture-v1",
+            }
+        )
+        settings.validate_isolation()
+
+    def test_production_configuration_rejects_non_postgresql_dsn(self) -> None:
+        for value in ("", "sqlite:///state.sqlite3", "mysql://localhost/rolemodel"):
+            with self.subTest(value=value):
+                settings = Settings.from_mapping({"DATABASE_DSN": value})
                 with self.assertRaises(IsolationError):
                     settings.validate_isolation()
 

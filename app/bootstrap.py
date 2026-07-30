@@ -4,12 +4,14 @@ from app.agent.service import AgentEngine
 from app.api import create_app
 from app.catalog.cache import CatalogCache
 from app.catalog.json_source import JsonCatalogSource
+from app.catalog.postgres import PostgresCatalogSource
 from app.config import Settings
 from app.providers.gigachat import (
     GigaChatHttpPlanner,
     GigaChatTokenManager,
     RequestsJsonTransport,
 )
+from app.runtime.postgres import PostgresStateStore
 from app.runtime.service import RuntimeService
 
 
@@ -22,8 +24,24 @@ def build_runtime(settings: Settings | None = None):
     settings = settings or Settings.from_env()
     settings.validate_isolation()
 
-    catalog_cache = CatalogCache(JsonCatalogSource(settings.catalog_path))
-    refresh = catalog_cache.refresh(settings.catalog_version)
+    if settings.catalog_backend == "postgres":
+        catalog_source = PostgresCatalogSource(
+            dsn=settings.effective_catalog_dsn,
+            schema=settings.catalog_schema,
+        )
+        catalog_source.verify_ready()
+        catalog_version = settings.catalog_version or catalog_source.active_version()
+        if catalog_version is None:
+            raise RuntimeError("V2 PostgreSQL catalog has no active release")
+    else:
+        if settings.catalog_path is None or settings.catalog_version is None:
+            raise RuntimeError(
+                "JSON catalog requires explicit path and version"
+            )
+        catalog_source = JsonCatalogSource(settings.catalog_path)
+        catalog_version = settings.catalog_version
+    catalog_cache = CatalogCache(catalog_source)
+    refresh = catalog_cache.refresh(catalog_version)
     if not refresh.activated and catalog_cache.status.active_version is None:
         raise RuntimeError(f"V2 catalog failed to load: {refresh.error}")
 
@@ -34,7 +52,10 @@ def build_runtime(settings: Settings | None = None):
         planner_deadline_ms=settings.planner_deadline_ms,
     )
     runtime = RuntimeService(
-        database_path=settings.state_database_path,
+        state_store=PostgresStateStore(
+            dsn=settings.database_dsn,
+            schema=settings.state_schema,
+        ),
         engine=engine,
     )
     runtime.initialize()

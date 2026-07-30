@@ -21,6 +21,7 @@ from app.agent.models import (
 )
 from app.catalog.cache import CatalogBundle, CatalogCache
 from app.telemetry import TurnTrace
+from app.tools.catalog import CatalogSearchTools, ToolResult, ToolStatus
 
 
 class Planner(Protocol):
@@ -29,6 +30,17 @@ class Planner(Protocol):
 
 def _normalize(text: str) -> str:
     return " ".join(re.sub(r"[^0-9a-zа-яё]+", " ", text.lower().replace("ё", "е")).split())
+
+
+def _contains_phrase(text: str, phrase: str) -> bool:
+    if not phrase:
+        return False
+    if re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text):
+        return True
+    if " " not in phrase and len(phrase) >= 5:
+        stem = phrase[:-1]
+        return any(token.startswith(stem) for token in text.split())
+    return False
 
 
 class AgentEngine:
@@ -285,6 +297,15 @@ class AgentEngine:
                 index = int(text_norm) - 1
                 if 0 <= index < len(pending.options):
                     selected = pending.options[index]
+                    if pending.topic in {"department", "position"}:
+                        return self._finish_profile_access(
+                            state=state,
+                            bundle=bundle,
+                            slots={
+                                **dict(state.slots),
+                                f"{pending.topic}_id": selected.id,
+                            },
+                        )
                     updated = replace(
                         state,
                         revision=state.revision + 1,
@@ -293,6 +314,13 @@ class AgentEngine:
                         pending_question=None,
                     )
                     return Outcome.HANDLED, updated, Answer(f"Выбран вариант: {selected.label}.", state.intent or "UNKNOWN"), None
+
+        organization = self._organization_request(
+            request=request,
+            bundle=bundle,
+        )
+        if organization is not None:
+            return organization
 
         safe, weak = self._system_matches(text_norm, bundle)
         if safe is not None:
@@ -409,14 +437,40 @@ class AgentEngine:
                 None,
             )
         elif slot_key == "department":
-            canonical = next(
-                (
-                    str(item["name"])
-                    for item in bundle.departments
-                    if _normalize(str(item.get("name") or "")) == value_norm
-                ),
-                None,
+            result = CatalogSearchTools(bundle).search_departments(
+                request.text,
+                city=str(state.slots.get("city") or "") or None,
             )
+            if result.status == ToolStatus.FOUND:
+                canonical = result.candidates[0].id
+                slot_key = "department_id"
+            elif result.status == ToolStatus.AMBIGUOUS:
+                return self._candidate_clarification(
+                    state=state,
+                    topic="department",
+                    result=result,
+                    slots=dict(state.slots),
+                    message="Нашлось несколько подразделений. Выберите нужное.",
+                )
+        elif slot_key == "position":
+            result = CatalogSearchTools(bundle).search_positions(
+                request.text,
+                city=str(state.slots.get("city") or "") or None,
+                department_id=(
+                    str(state.slots.get("department_id") or "") or None
+                ),
+            )
+            if result.status == ToolStatus.FOUND:
+                canonical = result.candidates[0].id
+                slot_key = "position_id"
+            elif result.status == ToolStatus.AMBIGUOUS:
+                return self._candidate_clarification(
+                    state=state,
+                    topic="position",
+                    result=result,
+                    slots=dict(state.slots),
+                    message="Нашлось несколько должностей. Выберите нужную.",
+                )
         elif slot_key == "system":
             safe, weak = self._system_matches(value_norm, bundle)
             if safe is not None:
@@ -458,17 +512,286 @@ class AgentEngine:
                 ),
                 None,
             )
+        resolved_slots = {**dict(state.slots), slot_key: canonical}
+        if slot_key in {"department_id", "position_id"}:
+            return self._finish_profile_access(
+                state=state,
+                bundle=bundle,
+                slots=resolved_slots,
+            )
         updated = replace(
             state,
             revision=state.revision + 1,
             phase="READY",
-            slots={**dict(state.slots), slot_key: canonical},
+            slots=resolved_slots,
             pending_question=None,
         )
         return (
             Outcome.HANDLED,
             updated,
             Answer("Контекст подтверждён. Уточните следующий параметр.", state.intent or "UNKNOWN"),
+            None,
+        )
+
+    def _organization_request(
+        self,
+        *,
+        request: TurnRequest,
+        bundle: CatalogBundle,
+    ) -> tuple[Outcome, TurnState, Answer | None, Failure | None] | None:
+        text_norm = _normalize(request.text)
+        if not any(
+            marker in text_norm
+            for marker in (
+                "отдел",
+                "подразделен",
+                "должност",
+                "руководител",
+                "начальник",
+                "риск менеджер",
+            )
+        ):
+            return None
+
+        tools = CatalogSearchTools(bundle)
+        city = next(
+            (
+                str(item.get("city") or "")
+                for item in bundle.departments
+                if _contains_phrase(
+                    text_norm,
+                    _normalize(str(item.get("city") or "")),
+                )
+            ),
+            str(request.state.slots.get("city") or ""),
+        )
+        slots = dict(request.state.slots)
+        if city:
+            slots["city"] = city
+
+        position_result = tools.search_positions(
+            request.text,
+            city=city or None,
+            department_id=str(slots.get("department_id") or "") or None,
+        )
+        if position_result.status == ToolStatus.FOUND:
+            slots["position_id"] = position_result.candidates[0].id
+        elif position_result.status == ToolStatus.AMBIGUOUS:
+            return self._candidate_clarification(
+                state=request.state,
+                topic="position",
+                result=position_result,
+                slots=slots,
+                message="Нашлось несколько должностей. Выберите нужную.",
+            )
+
+        department_result = tools.search_departments(
+            request.text,
+            city=city or None,
+        )
+        if department_result.status == ToolStatus.AMBIGUOUS:
+            return self._candidate_clarification(
+                state=request.state,
+                topic="department",
+                result=department_result,
+                slots=slots,
+                message=(
+                    "Подразделений с таким номером несколько. "
+                    "Выберите нужное или уточните город."
+                ),
+            )
+        if department_result.status == ToolStatus.FOUND:
+            slots["department_id"] = department_result.candidates[0].id
+        elif "department_id" not in slots:
+            updated = replace(
+                request.state,
+                revision=request.state.revision + 1,
+                intent="ROLE_DISCOVERY",
+                phase="AWAITING_SLOT",
+                slots=slots,
+                pending_question=PendingQuestion(topic="department", kind="slot"),
+            )
+            return (
+                Outcome.NEEDS_CLARIFICATION,
+                updated,
+                Answer(
+                    "Уточните подразделение: полное название или номер и город.",
+                    "CLARIFICATION",
+                ),
+                None,
+            )
+        return self._finish_profile_access(
+            state=request.state,
+            bundle=bundle,
+            slots=slots,
+        )
+
+    def _finish_profile_access(
+        self,
+        *,
+        state: TurnState,
+        bundle: CatalogBundle,
+        slots: dict[str, str],
+    ) -> tuple[Outcome, TurnState, Answer | None, Failure | None]:
+        department_id = str(slots.get("department_id") or "")
+        position_id = str(slots.get("position_id") or "")
+        if not department_id:
+            updated = replace(
+                state,
+                revision=state.revision + 1,
+                intent="ROLE_DISCOVERY",
+                phase="AWAITING_SLOT",
+                slots=slots,
+                pending_question=PendingQuestion(topic="department", kind="slot"),
+            )
+            return (
+                Outcome.NEEDS_CLARIFICATION,
+                updated,
+                Answer(
+                    "Уточните подразделение: полное название или номер и город.",
+                    "CLARIFICATION",
+                ),
+                None,
+            )
+        if not position_id:
+            updated = replace(
+                state,
+                revision=state.revision + 1,
+                intent="ROLE_DISCOVERY",
+                phase="AWAITING_SLOT",
+                slots=slots,
+                pending_question=PendingQuestion(topic="position", kind="slot"),
+            )
+            return (
+                Outcome.NEEDS_CLARIFICATION,
+                updated,
+                Answer(
+                    "Уточните должность для выбранного подразделения.",
+                    "CLARIFICATION",
+                ),
+                None,
+            )
+
+        tools = CatalogSearchTools(bundle)
+        profiles = tools.resolve_profiles(
+            city=str(slots.get("city") or "") or None,
+            department_id=department_id,
+            position_id=position_id,
+        )
+        if profiles.status == ToolStatus.NOT_FOUND:
+            updated = replace(
+                state,
+                revision=state.revision + 1,
+                intent="ROLE_DISCOVERY",
+                phase="AWAITING_SLOT",
+                slots=slots,
+                pending_question=PendingQuestion(topic="position", kind="slot"),
+            )
+            return (
+                Outcome.NEEDS_CLARIFICATION,
+                updated,
+                Answer(
+                    "Для этой пары подразделения и должности профиль не найден. "
+                    "Уточните должность.",
+                    "CLARIFICATION",
+                ),
+                None,
+            )
+        if profiles.status == ToolStatus.AMBIGUOUS:
+            return self._candidate_clarification(
+                state=state,
+                topic="profile",
+                result=profiles,
+                slots=slots,
+                message="Нашлось несколько профилей. Выберите нужный.",
+            )
+
+        profile_ids = [item.id for item in profiles.candidates]
+        systems = tools.search_systems(profile_ids=profile_ids, limit=10)
+        system_ids = [item.id for item in systems.candidates]
+        role_ids: list[str] = []
+        lines = ["Доступы для выбранного профиля:"]
+        for system_candidate in systems.candidates:
+            roles = tools.search_roles(
+                system_id=system_candidate.id,
+                profile_ids=profile_ids,
+                limit=10,
+            )
+            role_labels = [item.label for item in roles.candidates]
+            role_ids.extend(item.id for item in roles.candidates)
+            lines.append(
+                f"• {system_candidate.label}: "
+                + (", ".join(role_labels) if role_labels else "роли не найдены")
+            )
+        if not systems.candidates:
+            lines.append("Связанные АС и роли не найдены.")
+        resolved_slots = {
+            **slots,
+            "profile_id": profile_ids[0],
+        }
+        updated = replace(
+            state,
+            revision=state.revision + 1,
+            intent="ROLE_DISCOVERY",
+            phase="ANSWERED",
+            slots=resolved_slots,
+            pending_question=None,
+        )
+        return (
+            Outcome.HANDLED,
+            updated,
+            Answer(
+                text="\n".join(lines),
+                answer_type="PROFILE_ACCESS",
+                facts={
+                    "department_id": department_id,
+                    "position_id": position_id,
+                    "profile_ids": profile_ids,
+                    "system_ids": system_ids,
+                    "role_ids": role_ids,
+                    "catalog_version": bundle.version,
+                },
+            ),
+            None,
+        )
+
+    @staticmethod
+    def _candidate_clarification(
+        *,
+        state: TurnState,
+        topic: str,
+        result: ToolResult,
+        slots: dict[str, str],
+        message: str,
+    ) -> tuple[Outcome, TurnState, Answer | None, Failure | None]:
+        options = tuple(
+            Candidate(
+                id=item.id,
+                label=(
+                    f"{item.label} — {item.context['city']}"
+                    if item.context.get("city")
+                    else item.label
+                ),
+                confidence=item.score,
+            )
+            for item in result.candidates[:5]
+        )
+        updated = replace(
+            state,
+            revision=state.revision + 1,
+            intent="ROLE_DISCOVERY",
+            phase="AWAITING_SELECTION",
+            slots=slots,
+            pending_question=PendingQuestion(
+                topic=topic,
+                kind="candidate_selection",
+                options=options,
+            ),
+        )
+        return (
+            Outcome.NEEDS_CLARIFICATION,
+            updated,
+            Answer(message, "CLARIFICATION"),
             None,
         )
 

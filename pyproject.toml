@@ -9,6 +9,7 @@ description = "Fast hybrid role and access lookup assistant"
 requires-python = ">=3.9"
 dependencies = [
   "fastapi>=0.115,<1",
+  "psycopg[binary]>=3.2,<4",
   "requests>=2.31,<3",
   "uvicorn>=0.30,<1",
 ]
