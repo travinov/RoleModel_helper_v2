@@ -8,7 +8,7 @@ then starts the guarded V2 activation flow.
 
 ## Non-goals
 
-- Creating PostgreSQL accounts or granting privileges that require a DBA.
+- Creating or changing PostgreSQL accounts.
 - Changing, restarting, deleting, or repackaging V1.
 - Uploading a role-model workbook; V2 imports the active V1 PostgreSQL snapshot.
 - Embedding database passwords, GigaChat credentials, or certificates in the ZIP.
@@ -20,7 +20,7 @@ Inputs:
 - an extracted offline V2 release containing `wheelhouse/*.whl`;
 - SSH access to the current application server;
 - existing remote V1 installation and healthy V1 endpoint on port `8000`;
-- DSNs for the pre-created V2 runtime, migration-owner, and catalog-import roles.
+- the existing V1 PostgreSQL login and its password, as in the V1 installer.
 
 Outputs:
 
@@ -39,6 +39,9 @@ Outputs:
   and logs must survive a repeat deployment.
 - Secrets are entered without terminal echo, transferred over SSH through
   standard input, and never written to shell command arguments or release files.
+- The same existing PostgreSQL login is used for V2 runtime, migrations and
+  catalog import; isolation is provided by dedicated V2 schemas and application
+  guards rather than additional database roles.
 - The script refuses colliding ports, install directories, services, or schemas.
 
 ## Acceptance criteria
@@ -49,12 +52,15 @@ Outputs:
    V2 port `8001` before replacing V2 application files.
 3. Upload and server operations target only `~/RoleModelHelperV2`; V1 commands
    are read-only and no V1 service restart/stop is present.
-4. The remote `.env` contains port `8001`, separate V2 schemas and DSNs, and is
+4. The script requests one hidden password for the existing V1 database login,
+   matching the V1 deployment UX; it does not request new owner/app/writer
+   credentials.
+5. The remote `.env` contains port `8001`, separate V2 schemas and DSNs, and is
    mode `0600`; an existing protected `.env` is retained unless the operator
    explicitly chooses to replace it.
-5. The existing server installer copies GigaChat certificates from remote V1,
+6. The existing server installer copies GigaChat certificates from remote V1,
    installs the offline wheels, and configures only the V2 service.
-6. Activation stays interactive: it shows a dry-run and requires exact
+7. Activation stays interactive: it shows a dry-run and requires exact
    `PUBLISH`; it verifies health of both ports after starting V2.
-7. README gives the exact Downloads-to-project move and Mac launch commands and
-   states the DBA prerequisite clearly.
+8. README gives the exact Downloads-to-project move and Mac launch commands and
+   explains that the existing V1 PostgreSQL login is reused.

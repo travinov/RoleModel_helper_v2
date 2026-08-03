@@ -7,55 +7,20 @@ V2 переиспользует существующий PostgreSQL-класте
 - `rolemodel_v2_runtime` — сессии, ходы и latency telemetry;
 - `rolemodel_v2_catalog` — нормализованные immutable-релизы каталога.
 
-## Роли
+## Учётная запись
 
-Рекомендуются три учётные записи:
+Установка повторяет проверенную схему V1 и использует существующую учётную
+запись `CI09479675-pg-travinov`. Один DSN применяется для:
 
-- migration owner — создаёт/изменяет только схемы V2;
-- `rolemodel_v2_app` — DML в runtime и SELECT в catalog;
-- `rolemodel_v2_catalog_writer` — SELECT ограниченных таблиц V1 и DML в
-  catalog V2; используется только командой публикации.
+- создания и миграции отдельных схем V2;
+- runtime-запросов V2;
+- чтения активного snapshot из `rolemodel_helper` и записи каталога V2.
 
-Пароли создаются DBA и передаются через серверный secret store / `.env` с
-правами `0600`; их нельзя добавлять в Git.
-
-Пример DBA-заготовки без паролей (пароли DBA задаёт через принятый в организации
-secret-management процесс):
-
-```sql
-CREATE ROLE rolemodel_v2_owner LOGIN;
-CREATE ROLE rolemodel_v2_app LOGIN;
-CREATE ROLE rolemodel_v2_catalog_writer LOGIN;
-
-GRANT CONNECT ON DATABASE bdtest TO
-  rolemodel_v2_owner,
-  rolemodel_v2_app,
-  rolemodel_v2_catalog_writer;
-GRANT CREATE ON DATABASE bdtest TO rolemodel_v2_owner;
-```
-
-Migration CLI сама выдаёт гранты внутри схем V2. Для import job DBA отдельно
-выдаёт минимальный `USAGE` и `SELECT` на V1:
-
-```sql
-GRANT USAGE ON SCHEMA rolemodel_helper TO rolemodel_v2_catalog_writer;
-GRANT SELECT ON
-  rolemodel_helper.etl_run,
-  rolemodel_helper.snapshot,
-  rolemodel_helper.profile,
-  rolemodel_helper.profile_structure_segment,
-  rolemodel_helper.profile_department,
-  rolemodel_helper.profile_position,
-  rolemodel_helper.system,
-  rolemodel_helper.system_alias,
-  rolemodel_helper.system_alias_candidate,
-  rolemodel_helper.department_alias_candidate,
-  rolemodel_helper.entitlement,
-  rolemodel_helper.profile_entitlement_access
-TO rolemodel_v2_catalog_writer;
-```
-
-Runtime-роль не получает эти гранты.
+Новые роли и DBA-заявка не требуются. Пароль вводится скрыто в Mac deploy-script,
+передаётся только через SSH stdin и сохраняется в серверном `.env` с правами
+`0600`. Отдельные схемы и guards приложения не позволяют migration-командам V2
+выбрать схему V1, однако PostgreSQL-изоляции на уровне разных ролей в этой
+упрощённой модели нет.
 
 ## Последовательность установки
 

@@ -139,15 +139,12 @@ bash scripts/deploy_rolemodel_v2_remote.sh
 интерактивную activation. На шаге dry-run нужно проверить counts и ввести
 `PUBLISH`.
 
-До первого запуска администратор PostgreSQL должен создать три отдельные роли:
-`rolemodel_v2_owner`, `rolemodel_v2_app` и
-`rolemodel_v2_catalog_writer`. Скрипт скрыто запросит их пароли. По умолчанию он
-использует существующую БД V1 `10.135.162.149:5433/bdtest`; новый PostgreSQL
-сервер не нужен. Источником для импорта служит существующая схема V1
-`rolemodel_helper`; V2 создаёт только `rolemodel_v2_runtime` и
-`rolemodel_v2_catalog`. Создание ролей не автоматизируется deploy-скриптом,
-поскольку для этого нужны отдельные DBA-полномочия. Точная DBA-заготовка и
-минимальные grants приведены в `docs/deployment-postgresql.md`.
+Как и installer V1, скрипт использует существующую учётную запись PostgreSQL
+`CI09479675-pg-travinov` и скрыто запрашивает один её пароль. По умолчанию он
+подключается к существующей БД V1 `10.135.162.149:5433/bdtest`; новый сервер и
+новые роли PostgreSQL не нужны. Источником для импорта служит существующая схема
+V1 `rolemodel_helper`; V2 создаёт только отдельные схемы
+`rolemodel_v2_runtime` и `rolemodel_v2_catalog`.
 
 При повторном запуске существующие V2 `.env`, `.env.runtime`, `certs` и `logs`
 сохраняются. Чтобы осознанно заменить `.env`, запустите:
@@ -157,8 +154,8 @@ RMV2_REPLACE_ENV=1 bash scripts/deploy_rolemodel_v2_remote.sh
 ```
 
 SSH target и параметры существующей БД при необходимости задаются локальными
-переменными `RMV2_SSH_TARGET`, `RMV2_DB_HOST`, `RMV2_DB_PORT` и
-`RMV2_DB_NAME`. Пароли в ZIP и командную строку не попадают.
+переменными `RMV2_SSH_TARGET`, `RMV2_DB_HOST`, `RMV2_DB_PORT`, `RMV2_DB_NAME`
+и `RMV2_DB_USER`. Пароль в ZIP и командную строку не попадает.
 
 На целевом сервере проверка и установка выполняются без package index:
 
