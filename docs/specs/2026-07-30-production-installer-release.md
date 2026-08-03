@@ -38,7 +38,7 @@ reproducible release archive that never contains credentials.
 - Port `8000` and schema `public` remain forbidden even if the configurable
   `RMV2_V1_*` comparison values are changed. Service names must match
   `[A-Za-z0-9_.@-]+.service`, and the derived unit must remain directly below
-  `/etc/systemd/system`.
+  the current account's `~/.config/systemd/user` directory.
 - A release with `wheelhouse/*.whl` installs with `pip --no-index`; a source
   checkout without `wheelhouse` may use the normal package index.
 - Offline wheels target SberLinux 9 x86_64 / CPython 3.9 via
@@ -49,9 +49,8 @@ reproducible release archive that never contains credentials.
   create a venv with a working `ensurepip`.
 - The installer itself must run as the current ordinary account. EUID `0`
   (including `sudo bash installer`) fails immediately with guidance to rerun
-  without sudo. Only the individual systemd writes may use sudo. The unit
-  `User=` is the validated result of `id -un`, never the mutable `$USER`
-  environment variable.
+  without sudo. Installation and activation use only `systemctl --user`; they
+  must never require privileged writes or contain a `User=` override.
 - Release packaging excludes Git metadata, real env files, virtualenvs,
   certificates/keys/PEM files, caches, logs, databases/dumps, and generated
   output. Symlinks are rejected.
@@ -80,7 +79,7 @@ reproducible release archive that never contains credentials.
    traversal-style service names fail before target mutation.
 8. Existing output/checksum symlinks and a symlinked output parent are rejected
    without modifying their targets.
-9. Full-root installer execution exits before target mutation; an unsafe or
-   root run account cannot become the systemd unit user.
+9. Full-root installer execution exits before target mutation; the user unit is
+   written without sudo and contains no system-level `User=` override.
 10. A nested symlink ancestor cannot redirect either release artifact outside
     the requested output tree.

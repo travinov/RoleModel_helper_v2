@@ -344,7 +344,7 @@ def activate(
     emit("6/7 Перезапускаю только V2 service")
     _run(
         execute,
-        ["sudo", "systemctl", "restart", config.service_name],
+        ["systemctl", "--user", "restart", config.service_name],
         environment=environment,
     )
 
@@ -357,7 +357,7 @@ def activate(
             sleep(2)
     if v2_health is None or v2_health.get("catalog_ready", True) is False:
         execute(
-            ["sudo", "systemctl", "stop", config.service_name],
+            ["systemctl", "--user", "stop", config.service_name],
             capture=False,
             environment=environment,
         )
@@ -368,7 +368,7 @@ def activate(
     emit("7/7 Повторно проверяю V1 после запуска V2")
     if health_check(config.v1_port) is None:
         execute(
-            ["sudo", "systemctl", "stop", config.service_name],
+            ["systemctl", "--user", "stop", config.service_name],
             capture=False,
             environment=environment,
         )

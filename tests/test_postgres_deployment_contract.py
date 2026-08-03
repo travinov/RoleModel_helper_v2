@@ -26,10 +26,9 @@ class PostgresDeploymentContractTests(unittest.TestCase):
         self.assertIn("RMV2_CATALOG_WRITER_ROLE=", environment)
         self.assertIn('"-m", "app.catalog.migrate"', activation)
         self.assertIn("UMask=0077", installer)
-        self.assertIn("ProtectSystem=strict", installer)
-        self.assertIn("ProtectHome=read-only", installer)
-        self.assertIn("PrivateDevices=true", installer)
-        self.assertIn("RestrictSUIDSGID=true", installer)
+        self.assertIn('chmod 600 "$UNIT_PATH"', installer)
+        self.assertIn("systemctl --user", installer)
+        self.assertNotIn("sudo systemctl", installer)
         self.assertNotIn("STATE_DATABASE_PATH", environment)
         self.assertNotIn("sqlite", environment.lower())
 

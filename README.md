@@ -135,7 +135,8 @@ bash scripts/deploy_rolemodel_v2_remote.sh
 `CI09479675-lnx-travinov@tsles-assai0001.esrt.sber.ru`, проверяет удалённую V1,
 передаёт offline-пакет в staging, устанавливает V2 в
 `~/RoleModelHelperV2`, копирует сертификаты из удалённой
-`~/RoleModelHelper2`, настраивает только `rolemodel-helper-v2.service` и запускает
+`~/RoleModelHelper2`, настраивает только пользовательский service
+`~/.config/systemd/user/rolemodel-helper-v2.service` без `sudo` и запускает
 интерактивную activation. На шаге dry-run нужно проверить counts и ввести
 `PUBLISH`.
 

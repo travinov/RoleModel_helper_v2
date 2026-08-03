@@ -27,6 +27,9 @@ class MacRemoteDeploymentContractTests(unittest.TestCase):
         self.assertIn('[[ "$V1_PORT" == "8000" ]]', text)
         self.assertNotIn("systemctl restart rolemodel-helper.service", text)
         self.assertNotIn("systemctl stop rolemodel-helper.service", text)
+        self.assertIn("systemctl --user is-active", text)
+        self.assertIn("systemctl --user stop", text)
+        self.assertNotIn("sudo systemctl", text)
 
     def test_secrets_use_hidden_input_and_stdin_not_remote_arguments(self) -> None:
         text = DEPLOY.read_text(encoding="utf-8")

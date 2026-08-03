@@ -162,7 +162,7 @@ class GuidedActivationTests(unittest.TestCase):
             self.assertIn("app.catalog.migrate", command_text[1])
             self.assertIn("app.catalog.publish --dry-run", command_text[2])
             self.assertIn("app.catalog.publish", command_text[3])
-            self.assertEqual(calls[4], ("sudo", "systemctl", "restart", config.service_name))
+            self.assertEqual(calls[4], ("systemctl", "--user", "restart", config.service_name))
             self.assertEqual(health_calls, [8000, 8001, 8000])
             self.assertTrue(any("инструкц" in line.lower() for line in output))
 
@@ -230,7 +230,7 @@ class GuidedActivationTests(unittest.TestCase):
                 )
 
             self.assertIn(
-                ("sudo", "systemctl", "stop", config.service_name),
+                ("systemctl", "--user", "stop", config.service_name),
                 calls,
             )
             self.assertFalse(any("rolemodel-helper.service" in call for call in calls))
