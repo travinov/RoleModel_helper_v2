@@ -15,11 +15,7 @@ SERVICE_NAME="${RMV2_SERVICE_NAME:-rolemodel-helper-v2.service}"
 DB_HOST="${RMV2_DB_HOST:-10.135.162.149}"
 DB_PORT="${RMV2_DB_PORT:-5433}"
 DB_NAME="${RMV2_DB_NAME:-bdtest}"
-APP_ROLE="${RMV2_DATABASE_APP_ROLE:-rolemodel_v2_app}"
-OWNER_ROLE="${RMV2_DATABASE_OWNER_ROLE:-rolemodel_v2_owner}"
-IMPORT_ROLE="${RMV2_CATALOG_WRITER_ROLE:-rolemodel_v2_catalog_writer}"
-STATE_SCHEMA="rolemodel_v2_runtime"
-CATALOG_SCHEMA="rolemodel_v2_catalog"
+DB_USER="${RMV2_DB_USER:-CI09479675-pg-travinov}"
 ENV_TRANSFER=""
 REMOTE_STAGE=""
 
@@ -89,7 +85,7 @@ REMOTE_PREFLIGHT
 HAS_REMOTE_ENV="$(ssh "$SSH_TARGET" 'if [[ -f "$HOME/RoleModelHelperV2/.env" && ! -L "$HOME/RoleModelHelperV2/.env" ]]; then printf yes; else printf no; fi')"
 
 make_dsn() {
-  local role="$1"
+  local database_user="$1"
   local password="$2"
   printf '%s' "$password" | python3 -c '
 import sys
@@ -99,31 +95,23 @@ password = sys.stdin.read()
 print("postgresql://{}:{}@{}:{}/{}".format(
     quote(role, safe=""), quote(password, safe=""), host, port, quote(database, safe="")
 ))
-' "$role" "$DB_HOST" "$DB_PORT" "$DB_NAME"
+' "$database_user" "$DB_HOST" "$DB_PORT" "$DB_NAME"
 }
 
 if [[ "$HAS_REMOTE_ENV" == "yes" && "${RMV2_REPLACE_ENV:-0}" != "1" ]]; then
   echo "Сохраняю существующий удалённый .env V2 (RMV2_REPLACE_ENV=1 — заменить)."
 else
   echo
-  echo "Нужны пароли трёх заранее созданных PostgreSQL-ролей V2."
+  echo "Используется существующая учётная запись PostgreSQL, как в V1."
   echo "База: $DB_HOST:$DB_PORT/$DB_NAME"
-  read -r -s -p "Пароль $APP_ROLE: " APP_PASSWORD
-  echo
-  read -r -s -p "Пароль $OWNER_ROLE: " OWNER_PASSWORD
-  echo
-  read -r -s -p "Пароль $IMPORT_ROLE: " IMPORT_PASSWORD
+  read -r -s -p "Пароль PostgreSQL для $DB_USER: " DB_PASSWORD
   echo
   read -r -s -p "GigaChat Authorization key (Enter, если mTLS достаточно): " GIGACHAT_AUTH_KEY
   echo
-  [[ -n "$APP_PASSWORD" ]] || die "пустой пароль runtime-роли"
-  [[ -n "$OWNER_PASSWORD" ]] || die "пустой пароль owner-роли"
-  [[ -n "$IMPORT_PASSWORD" ]] || die "пустой пароль import-роли"
+  [[ -n "$DB_PASSWORD" ]] || die "пустой пароль PostgreSQL"
 
-  APP_DSN="$(make_dsn "$APP_ROLE" "$APP_PASSWORD")"
-  OWNER_DSN="$(make_dsn "$OWNER_ROLE" "$OWNER_PASSWORD")"
-  IMPORT_DSN="$(make_dsn "$IMPORT_ROLE" "$IMPORT_PASSWORD")"
-  unset APP_PASSWORD OWNER_PASSWORD IMPORT_PASSWORD
+  DATABASE_DSN="$(make_dsn "$DB_USER" "$DB_PASSWORD")"
+  unset DB_PASSWORD
 
   ENV_TRANSFER="$(mktemp -t rolemodel-v2-env.XXXXXX)"
   chmod 600 "$ENV_TRANSFER"
@@ -133,16 +121,16 @@ else
       'RMV2_APP_PORT=8001' \
       'RMV2_INSTALL_DIR=~/RoleModelHelperV2' \
       'RMV2_SERVICE_NAME=rolemodel-helper-v2.service' \
-      "RMV2_DATABASE_DSN=$APP_DSN" \
-      "RMV2_MIGRATION_DSN=$OWNER_DSN" \
-      "RMV2_DATABASE_APP_ROLE=$APP_ROLE" \
+      "RMV2_DATABASE_DSN=$DATABASE_DSN" \
+      "RMV2_MIGRATION_DSN=$DATABASE_DSN" \
+      "RMV2_DATABASE_APP_ROLE=$DB_USER" \
       'RMV2_STATE_SCHEMA=rolemodel_v2_runtime' \
       'RMV2_CATALOG_BACKEND=postgres' \
-      "RMV2_CATALOG_DSN=$APP_DSN" \
+      "RMV2_CATALOG_DSN=$DATABASE_DSN" \
       'RMV2_CATALOG_SCHEMA=rolemodel_v2_catalog' \
-      "RMV2_CATALOG_READER_ROLE=$APP_ROLE" \
-      "RMV2_CATALOG_WRITER_ROLE=$IMPORT_ROLE" \
-      "RMV2_CATALOG_IMPORT_DSN=$IMPORT_DSN" \
+      "RMV2_CATALOG_READER_ROLE=$DB_USER" \
+      "RMV2_CATALOG_WRITER_ROLE=$DB_USER" \
+      "RMV2_CATALOG_IMPORT_DSN=$DATABASE_DSN" \
       'RMV2_V1_APP_PORT=8000' \
       'RMV2_V1_INSTALL_DIR=~/RoleModelHelper2' \
       'RMV2_V1_SERVICE_NAME=rolemodel-helper.service' \
@@ -153,7 +141,7 @@ else
       printf 'RMV2_GIGACHAT_AUTH_KEY=%s\n' "$GIGACHAT_AUTH_KEY"
     fi
   } >"$ENV_TRANSFER"
-  unset APP_DSN OWNER_DSN IMPORT_DSN GIGACHAT_AUTH_KEY
+  unset DATABASE_DSN GIGACHAT_AUTH_KEY
 fi
 
 REMOTE_STAGE="$(ssh "$SSH_TARGET" 'stage=$(mktemp -d "$HOME/.RoleModelHelperV2.deploy.XXXXXX"); basename "$stage"')"

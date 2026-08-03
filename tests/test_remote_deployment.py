@@ -30,7 +30,14 @@ class MacRemoteDeploymentContractTests(unittest.TestCase):
 
     def test_secrets_use_hidden_input_and_stdin_not_remote_arguments(self) -> None:
         text = DEPLOY.read_text(encoding="utf-8")
-        self.assertIn("read -r -s", text)
+        self.assertEqual(text.count("read -r -s -p"), 2)
+        self.assertIn('DB_USER="${RMV2_DB_USER:-CI09479675-pg-travinov}"', text)
+        self.assertIn('Пароль PostgreSQL для $DB_USER:', text)
+        self.assertNotIn("rolemodel_v2_owner", text)
+        self.assertNotIn("rolemodel_v2_app", text)
+        self.assertNotIn("rolemodel_v2_catalog_writer", text)
+        self.assertNotIn("OWNER_PASSWORD", text)
+        self.assertNotIn("IMPORT_PASSWORD", text)
         self.assertIn('ssh "$SSH_TARGET" "umask 077; cat >', text)
         self.assertNotIn("eval ", text)
         self.assertNotIn("source .env", text)
