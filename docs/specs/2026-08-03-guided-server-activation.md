@@ -26,7 +26,8 @@ services.
 ## Constraints
 
 - Parse `.env` as data; never source or evaluate it.
-- Run as an ordinary account. Use `sudo` only for the named V2 systemd service.
+- Run as an ordinary account and control only the named V2 user service with
+  `systemctl --user`; never require `sudo`.
 - Require port `8001`, non-`public` V2 schemas, PostgreSQL DSNs, TLS verification,
   and regular non-symlink GigaChat certificate/key files.
 - Check V1 health before any migration.

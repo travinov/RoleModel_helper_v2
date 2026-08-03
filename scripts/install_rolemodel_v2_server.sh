@@ -47,7 +47,8 @@ if [[ ! "$SERVICE_NAME" =~ $SERVICE_NAME_RE ]]; then
   echo "Refusing unsafe systemd service name." >&2
   exit 2
 fi
-SYSTEMD_DIR="/etc/systemd/system"
+SYSTEMD_DIR="$HOME/.config/systemd/user"
+mkdir -p "$SYSTEMD_DIR"
 UNIT_PATH="$SYSTEMD_DIR/$SERVICE_NAME"
 CANONICAL_UNIT_PATH="$(readlink -m "$UNIT_PATH")"
 if [[ "$(dirname "$CANONICAL_UNIT_PATH")" != "$SYSTEMD_DIR" ]]; then
@@ -56,6 +57,11 @@ if [[ "$(dirname "$CANONICAL_UNIT_PATH")" != "$SYSTEMD_DIR" ]]; then
 fi
 if [[ -L "$UNIT_PATH" ]]; then
   echo "Refusing symlinked systemd unit path." >&2
+  exit 2
+fi
+if ! command -v systemctl >/dev/null 2>&1 || \
+   ! systemctl --user show-environment >/dev/null 2>&1; then
+  echo "User systemd is unavailable for the current account." >&2
   exit 2
 fi
 
@@ -108,39 +114,31 @@ else
   "$INSTALL_DIR/.venv/bin/python" -m pip install -r "$INSTALL_DIR/requirements.txt"
 fi
 
-sudo tee "$UNIT_PATH" >/dev/null <<EOF
+mkdir -p "$INSTALL_DIR/logs"
+chmod 700 "$INSTALL_DIR/logs"
+cat > "$UNIT_PATH" <<EOF
 [Unit]
 Description=RoleModel Helper V2
 After=network-online.target
 
 [Service]
 Type=simple
-User=$RUN_USER
 WorkingDirectory=$INSTALL_DIR
 EnvironmentFile=$INSTALL_DIR/.env.runtime
 ExecStart=$INSTALL_DIR/.venv/bin/python -m app
 Restart=on-failure
-RestartSec=3
+RestartSec=5
 UMask=0077
-NoNewPrivileges=true
-PrivateTmp=true
-PrivateDevices=true
-ProtectSystem=strict
-ProtectHome=read-only
-ProtectKernelTunables=true
-ProtectKernelModules=true
-ProtectControlGroups=true
-RestrictSUIDSGID=true
-RestrictRealtime=true
-LockPersonality=true
-SystemCallArchitectures=native
+StandardOutput=append:$INSTALL_DIR/logs/rolemodel-helper-v2.out.log
+StandardError=append:$INSTALL_DIR/logs/rolemodel-helper-v2.err.log
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 EOF
+chmod 600 "$UNIT_PATH"
 
-sudo systemctl daemon-reload
-sudo systemctl enable "$SERVICE_NAME"
+systemctl --user daemon-reload
+systemctl --user enable "$SERVICE_NAME"
 echo "Installed $SERVICE_NAME without starting it."
 echo "Review PostgreSQL settings in $INSTALL_DIR/.env, then run:"
 echo "  cd $INSTALL_DIR && bash scripts/activate_rolemodel_v2_server.sh"

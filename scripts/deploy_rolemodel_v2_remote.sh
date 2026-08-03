@@ -75,7 +75,7 @@ if [[ -e "$HOME/RoleModelHelperV2" && -L "$HOME/RoleModelHelperV2" ]]; then
   exit 2
 fi
 if command -v ss >/dev/null 2>&1 && ss -ltn | awk '{print $4}' | grep -Eq ':8001$'; then
-  if ! systemctl is-active --quiet rolemodel-helper-v2.service 2>/dev/null; then
+  if ! systemctl --user is-active --quiet rolemodel-helper-v2.service 2>/dev/null; then
     echo "Port 8001 is occupied by a process other than the known V2 service" >&2
     exit 2
   fi
@@ -195,7 +195,7 @@ fi
 
 echo "Запускаю удалённые installer и activation. При запросе введите PUBLISH."
 ssh -tt "$SSH_TARGET" \
-  "cd \"\$HOME/$REMOTE_DIR\" && { ! systemctl is-active --quiet '$SERVICE_NAME' 2>/dev/null || sudo systemctl stop '$SERVICE_NAME'; } && bash scripts/install_rolemodel_v2_server.sh && bash scripts/activate_rolemodel_v2_server.sh"
+  "cd \"\$HOME/$REMOTE_DIR\" && { ! systemctl --user is-active --quiet '$SERVICE_NAME' 2>/dev/null || systemctl --user stop '$SERVICE_NAME'; } && bash scripts/install_rolemodel_v2_server.sh && bash scripts/activate_rolemodel_v2_server.sh"
 
 echo
 echo "Готово: V1 продолжает работать на 8000, V2 установлена на 8001."

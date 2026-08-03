@@ -149,7 +149,7 @@ class InstallerEffectiveConfigTests(unittest.TestCase):
                     completed = run_preflight(env_file, project)
                     self.assertNotEqual(completed.returncode, 0)
 
-    def test_service_name_is_strict_and_unit_path_is_canonical(self) -> None:
+    def test_service_name_is_strict_and_user_unit_path_is_canonical(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             temp = Path(raw).resolve()
             project = temp / "RoleModelHelperV2"
@@ -166,10 +166,11 @@ class InstallerEffectiveConfigTests(unittest.TestCase):
             self.assertNotEqual(completed.returncode, 0)
 
             installer = INSTALLER.read_text(encoding="utf-8")
-            self.assertIn("/etc/systemd/system", installer)
+            self.assertIn("$HOME/.config/systemd/user", installer)
             self.assertIn("SYSTEMD_DIR", installer)
             self.assertIn("UNIT_PATH", installer)
             self.assertIn("SERVICE_NAME_RE", installer)
+            self.assertNotIn("/etc/systemd/system", installer)
 
     def test_python39_venv_preflight_precedes_target_mutation(self) -> None:
         installer = INSTALLER.read_text(encoding="utf-8")
@@ -181,7 +182,7 @@ class InstallerEffectiveConfigTests(unittest.TestCase):
         self.assertLess(ensurepip_check, env_copy)
         self.assertLess(ensurepip_check, target_venv)
 
-    def test_root_execution_is_rejected_first_and_unit_uses_validated_id_user(self) -> None:
+    def test_root_execution_is_rejected_first_and_installer_never_uses_sudo(self) -> None:
         installer = INSTALLER.read_text(encoding="utf-8")
         root_guard = installer.index("EUID")
         project_resolution = installer.index("PROJECT_DIR=")
@@ -190,21 +191,15 @@ class InstallerEffectiveConfigTests(unittest.TestCase):
         self.assertLess(root_guard, env_copy)
         self.assertIn("обычным пользователем", installer)
         self.assertIn("id -un", installer)
-        self.assertIn("User=$RUN_USER", installer)
-        self.assertNotIn("User=$USER", installer)
+        self.assertNotIn("User=", installer)
         sudo_lines = [
             line.strip()
             for line in installer.splitlines()
             if line.strip().startswith("sudo ")
         ]
-        self.assertEqual(
-            sudo_lines,
-            [
-                'sudo tee "$UNIT_PATH" >/dev/null <<EOF',
-                "sudo systemctl daemon-reload",
-                'sudo systemctl enable "$SERVICE_NAME"',
-            ],
-        )
+        self.assertEqual(sudo_lines, [])
+        self.assertIn("systemctl --user daemon-reload", installer)
+        self.assertIn('systemctl --user enable "$SERVICE_NAME"', installer)
 
         with tempfile.TemporaryDirectory() as raw:
             temp = Path(raw).resolve()

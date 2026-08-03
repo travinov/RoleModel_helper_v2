@@ -42,6 +42,8 @@ Outputs:
 - The same existing PostgreSQL login is used for V2 runtime, migrations and
   catalog import; isolation is provided by dedicated V2 schemas and application
   guards rather than additional database roles.
+- Match V1 service ownership: install `rolemodel-helper-v2.service` as a user
+  unit under `~/.config/systemd/user` and use no sudo operation.
 - The script refuses colliding ports, install directories, services, or schemas.
 
 ## Acceptance criteria
