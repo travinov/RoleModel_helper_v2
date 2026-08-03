@@ -117,7 +117,7 @@ After=network-online.target
 Type=simple
 User=$RUN_USER
 WorkingDirectory=$INSTALL_DIR
-EnvironmentFile=$INSTALL_DIR/.env
+EnvironmentFile=$INSTALL_DIR/.env.runtime
 ExecStart=$INSTALL_DIR/.venv/bin/python -m app
 Restart=on-failure
 RestartSec=3
@@ -141,12 +141,8 @@ EOF
 
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
-echo "Installed $SERVICE_NAME. Review $INSTALL_DIR/.env, then migrate V2 only:"
-echo "  $INSTALL_DIR/.venv/bin/python -m app.runtime.migrate"
-echo "  $INSTALL_DIR/.venv/bin/python -m app.catalog.migrate"
-echo "Validate the active V1 snapshot and counts without writing:"
-echo "  $INSTALL_DIR/.venv/bin/python -m app.catalog.publish --dry-run"
-echo "Publish only after the dry-run counts and SHA-256 are approved:"
-echo "  $INSTALL_DIR/.venv/bin/python -m app.catalog.publish"
-echo "Start the service only after the migration succeeds:"
-echo "  sudo systemctl start $SERVICE_NAME"
+echo "Installed $SERVICE_NAME without starting it."
+echo "Review PostgreSQL settings in $INSTALL_DIR/.env, then run:"
+echo "  cd $INSTALL_DIR && bash scripts/activate_rolemodel_v2_server.sh"
+echo "The activation script migrates V2 only, shows catalog dry-run results,"
+echo "requires explicit PUBLISH confirmation, starts V2, and checks V1/V2 health."

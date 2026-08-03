@@ -130,6 +130,58 @@ bash scripts/install_rolemodel_v2_server.sh
 `pip --no-index --find-links`. В source checkout без wheelhouse сохраняется
 обычная online-установка для разработки.
 
+## Что делать после installer
+
+Installer не запускает сервис и не публикует данные автоматически. Сначала
+откройте созданный файл:
+
+```bash
+nano "$HOME/RoleModelHelperV2/.env"
+```
+
+Обязательно проверьте:
+
+- `RMV2_APP_HOST=0.0.0.0`, если V2 должна открываться с других компьютеров;
+- `RMV2_APP_PORT=8001`;
+- `RMV2_DATABASE_DSN` и `RMV2_CATALOG_DSN` используют runtime-роль V2;
+- `RMV2_MIGRATION_DSN` использует владельца миграций V2;
+- `RMV2_CATALOG_IMPORT_DSN` использует import-роль, которая читает только
+  таблицы активного snapshot V1 и пишет каталог V2;
+- схемы равны `rolemodel_v2_runtime` и `rolemodel_v2_catalog`;
+- `RMV2_TLS_VERIFY=true`;
+- пути `RMV2_GIGACHAT_CERT_FILE`, `RMV2_GIGACHAT_KEY_FILE` и optional CA
+  уже заполнены installer и указывают на `~/RoleModelHelperV2/certs/gigachat`.
+
+DSN могут вести в тот же PostgreSQL host/port/database, что у V1. Новый сервер
+PostgreSQL не требуется, но роли и схемы V2 должны быть отдельными. Пароли не
+добавляйте в Git; храните их только в `.env` с mode `0600` или в серверном
+credential store.
+
+После сохранения `.env` запустите от обычного пользователя:
+
+```bash
+cd "$HOME/RoleModelHelperV2"
+bash scripts/activate_rolemodel_v2_server.sh
+```
+
+Activation выполняет последовательно:
+
+1. проверку health V1 на `8000`;
+2. миграцию только `rolemodel_v2_runtime`;
+3. миграцию только `rolemodel_v2_catalog`;
+4. `app.catalog.publish --dry-run` с выводом version, source SHA-256 и counts;
+5. ожидание точного подтверждения `PUBLISH`;
+6. атомарную публикацию активного снимка V1 в каталог V2;
+7. restart только `rolemodel-helper-v2.service` и dual-health V1/V2.
+
+Если подтверждение не введено, публикации и запуска не будет. Если V2 health
+не поднимется или после запуска пропадёт V1 health, скрипт остановит только V2.
+Excel повторно загружать не нужно: используется активный PostgreSQL snapshot V1.
+
+Текущий V1 snapshot adapter не содержит статические корпоративные инструкции.
+Если dry-run показывает `instructions: 0`, роли и доступы будут опубликованы,
+но инструкции «как получить доступ» нужно импортировать отдельным адаптером.
+
 ## Проверки
 
 ```bash
