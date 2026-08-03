@@ -117,6 +117,49 @@ Builder скачивает только binary wheels для
 сертификаты, ключи, caches, logs, базы и предыдущий `output/` исключаются.
 Повторная сборка неизменного дерева даёт идентичный ZIP и `.sha256`.
 
+### Установка с Mac по SSH
+
+Это основной production-сценарий, повторяющий схему установки V1. На Mac
+достаточно распаковать именно offline ZIP (в нём должен быть `wheelhouse`),
+переместить каталог V2 рядом с локальным каталогом V1 и запустить один скрипт:
+
+```bash
+test ! -e "/Users/travinov-sv/SBRF/Агентные решение/PythonProject/RoleModelHelperV2"
+mv "/Users/travinov-sv/Downloads/RoleModelHelperV2" \
+  "/Users/travinov-sv/SBRF/Агентные решение/PythonProject/RoleModelHelperV2"
+cd "/Users/travinov-sv/SBRF/Агентные решение/PythonProject/RoleModelHelperV2"
+bash scripts/deploy_rolemodel_v2_remote.sh
+```
+
+Локальный V1 checkout скрипту не нужен. Он подключается по SSH к
+`CI09479675-lnx-travinov@tsles-assai0001.esrt.sber.ru`, проверяет удалённую V1,
+передаёт offline-пакет в staging, устанавливает V2 в
+`~/RoleModelHelperV2`, копирует сертификаты из удалённой
+`~/RoleModelHelper2`, настраивает только `rolemodel-helper-v2.service` и запускает
+интерактивную activation. На шаге dry-run нужно проверить counts и ввести
+`PUBLISH`.
+
+До первого запуска администратор PostgreSQL должен создать три отдельные роли:
+`rolemodel_v2_owner`, `rolemodel_v2_app` и
+`rolemodel_v2_catalog_writer`. Скрипт скрыто запросит их пароли. По умолчанию он
+использует существующую БД V1 `10.135.162.149:5433/bdtest`; новый PostgreSQL
+сервер не нужен. Источником для импорта служит существующая схема V1
+`rolemodel_helper`; V2 создаёт только `rolemodel_v2_runtime` и
+`rolemodel_v2_catalog`. Создание ролей не автоматизируется deploy-скриптом,
+поскольку для этого нужны отдельные DBA-полномочия. Точная DBA-заготовка и
+минимальные grants приведены в `docs/deployment-postgresql.md`.
+
+При повторном запуске существующие V2 `.env`, `.env.runtime`, `certs` и `logs`
+сохраняются. Чтобы осознанно заменить `.env`, запустите:
+
+```bash
+RMV2_REPLACE_ENV=1 bash scripts/deploy_rolemodel_v2_remote.sh
+```
+
+SSH target и параметры существующей БД при необходимости задаются локальными
+переменными `RMV2_SSH_TARGET`, `RMV2_DB_HOST`, `RMV2_DB_PORT` и
+`RMV2_DB_NAME`. Пароли в ZIP и командную строку не попадают.
+
 На целевом сервере проверка и установка выполняются без package index:
 
 ```bash
