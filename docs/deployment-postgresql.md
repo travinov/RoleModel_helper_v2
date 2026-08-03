@@ -19,31 +19,39 @@ V2 переиспользует существующий PostgreSQL-класте
 Пароли создаются DBA и передаются через серверный secret store / `.env` с
 правами `0600`; их нельзя добавлять в Git.
 
-Пример DBA-заготовки без паролей:
+Пример DBA-заготовки без паролей (пароли DBA задаёт через принятый в организации
+secret-management процесс):
 
 ```sql
+CREATE ROLE rolemodel_v2_owner LOGIN;
 CREATE ROLE rolemodel_v2_app LOGIN;
 CREATE ROLE rolemodel_v2_catalog_writer LOGIN;
+
+GRANT CONNECT ON DATABASE bdtest TO
+  rolemodel_v2_owner,
+  rolemodel_v2_app,
+  rolemodel_v2_catalog_writer;
+GRANT CREATE ON DATABASE bdtest TO rolemodel_v2_owner;
 ```
 
 Migration CLI сама выдаёт гранты внутри схем V2. Для import job DBA отдельно
 выдаёт минимальный `USAGE` и `SELECT` на V1:
 
 ```sql
-GRANT USAGE ON SCHEMA <v1_schema> TO rolemodel_v2_catalog_writer;
+GRANT USAGE ON SCHEMA rolemodel_helper TO rolemodel_v2_catalog_writer;
 GRANT SELECT ON
-  <v1_schema>.etl_run,
-  <v1_schema>.snapshot,
-  <v1_schema>.profile,
-  <v1_schema>.profile_structure_segment,
-  <v1_schema>.profile_department,
-  <v1_schema>.profile_position,
-  <v1_schema>.system,
-  <v1_schema>.system_alias,
-  <v1_schema>.system_alias_candidate,
-  <v1_schema>.department_alias_candidate,
-  <v1_schema>.entitlement,
-  <v1_schema>.profile_entitlement_access
+  rolemodel_helper.etl_run,
+  rolemodel_helper.snapshot,
+  rolemodel_helper.profile,
+  rolemodel_helper.profile_structure_segment,
+  rolemodel_helper.profile_department,
+  rolemodel_helper.profile_position,
+  rolemodel_helper.system,
+  rolemodel_helper.system_alias,
+  rolemodel_helper.system_alias_candidate,
+  rolemodel_helper.department_alias_candidate,
+  rolemodel_helper.entitlement,
+  rolemodel_helper.profile_entitlement_access
 TO rolemodel_v2_catalog_writer;
 ```
 
